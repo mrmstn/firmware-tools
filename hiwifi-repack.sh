@@ -107,9 +107,10 @@ modify_rootfs()
 	if [ "$ENABLE_ROOT_LOGIN" = Y ]; then
 		if ! grep 'tty[SA]' etc/inittab &>/dev/null; then
 			case "$MAJOR_ARCH" in
-				ar71xx) echo 'ttyATH0::askfirst:/bin/ash --login' >> etc/inittab;;
-				ralink) echo 'ttyS1::askfirst:/bin/ash --login' >> etc/inittab;;
+				ar71xx) echo 'ttyATH0::askfirst:/bin/ash --login' >> inittab;;
+				ralink) echo 'ttyS1::askfirst:/bin/ash --login' >> inittab;;
 			esac
+			cp inittab etc
 		fi
 		# Hack this line: 'sed -i "/login/d" /etc/inittab'
 		[ -f lib/functions/system.sh ] && sed -i '/sed.*\/login\/d.*inittab/d' lib/functions/system.sh || :
@@ -345,8 +346,8 @@ do_firmware_repack()
 	[ -d /tftpboot ] && cp -vf "$new_romfile" /tftpboot/recovery.bin
 	[ -L recovery.bin ] && ln -sf "$new_romfile" recovery.bin
 
-	rm -f root.squashfs* *-uImage.bin *-oemparts.bin
-	rm -rf $rootfs_root /tmp/opkg-lists
+	# rm -f root.squashfs* *-uImage.bin *-oemparts.bin
+	# rm -rf $rootfs_root /tmp/opkg-lists
 
 	exit 0
 }
