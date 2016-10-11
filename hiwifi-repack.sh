@@ -14,6 +14,8 @@ STRIP_UBOOT=N
 OPKG_REMOVE_LIST=
 OPKG_INSTALL_LIST=
 ROOTFS_CMDS=
+ONLY_EXTRACT=
+ONLY_PACK=N
 
 print_green()
 {
@@ -65,6 +67,8 @@ Options:
  -u                        unlock U-boot by replacing with an old version
  -U                        strip U-boot from firmware (plain 'sysupgrade' format)
  -x <commands>             execute commands after all other operations
+ -E                        extract
+ -P	                   pack
 EOF
 }
 
@@ -184,6 +188,12 @@ do_firmware_repack()
 				ENABLE_ROOT_LOGIN=Y
 				UNLOCK_UBOOT=Y
 				;;
+			-E)
+				ONLY_EXTRACT=Y
+				;;
+			-P)
+				ONLY_PACK=Y
+				;;
 			-x)
 				shift 1
 				ROOTFS_CMDS="$ROOTFS_CMDS$1
@@ -276,44 +286,48 @@ do_firmware_repack()
 			dd if="$old_romfile" bs=64k count=$KERNEL_OFFSET_64K > $MODEL_NAME-oemparts.bin
 		fi
 	fi
-
-	# Search for SquashFS offset
-	local __offset_64k=`expr $KERNEL_OFFSET_64K + 8`
-	while [ $__offset_64k -lt 32 ]; do
-		local __magic=`dd if="$old_romfile" bs=64k skip=$__offset_64k count=1 2>/dev/null | get_magic_long`
-		if [ "$__magic" = 68737173 ]; then
-			SQUASHFS_OFFSET_64K=$__offset_64k
-			echo "Found SquashFS at 64k * $__offset_64k."
-			break
+	if [ "$ONLY_PACK" = N ]; then
+		# Search for SquashFS offset
+		local __offset_64k=`expr $KERNEL_OFFSET_64K + 8`
+		while [ $__offset_64k -lt 32 ]; do
+			local __magic=`dd if="$old_romfile" bs=64k skip=$__offset_64k count=1 2>/dev/null | get_magic_long`
+			if [ "$__magic" = 68737173 ]; then
+				SQUASHFS_OFFSET_64K=$__offset_64k
+				echo "Found SquashFS at 64k * $__offset_64k."
+				break
+			fi
+			__offset_64k=`expr $__offset_64k + 1`
+		done
+		if [ -z "$SQUASHFS_OFFSET_64K" ]; then
+			echo "*** Cannot find SquashFS offset in firmware."
+			exit 1
 		fi
-		__offset_64k=`expr $__offset_64k + 1`
-	done
-	if [ -z "$SQUASHFS_OFFSET_64K" ]; then
-		echo "*** Cannot find SquashFS offset in firmware."
-		exit 1
-	fi
 
-	print_green ">>> Extracting kernel, rootfs partitions ..."
+		print_green ">>> Extracting kernel, rootfs partitions ..."
 
-	# Partition: kernel
-	dd if="$old_romfile" bs=64k skip=$KERNEL_OFFSET_64K count=`expr $SQUASHFS_OFFSET_64K - $KERNEL_OFFSET_64K` > $MODEL_NAME-uImage.bin
-	# Partition: rootfs
-	dd if="$old_romfile" bs=64k skip=$SQUASHFS_OFFSET_64K > root.squashfs.orig
+		# Partition: kernel
+		dd if="$old_romfile" bs=64k skip=$KERNEL_OFFSET_64K count=`expr $SQUASHFS_OFFSET_64K - $KERNEL_OFFSET_64K` > $MODEL_NAME-uImage.bin
+		# Partition: rootfs
+		dd if="$old_romfile" bs=64k skip=$SQUASHFS_OFFSET_64K > root.squashfs.orig
 
-	print_green ">>> Extracting SquashFS into directory squashfs-root/ ..."
-	# Extract the file system, to squashfs-root/
-	rm -rf squashfs-root
-	unsquashfs root.squashfs.orig
-	local rootfs_root=squashfs-root
+		print_green ">>> Extracting SquashFS into directory squashfs-root/ ..."
+		# Extract the file system, to squashfs-root/
+		rm -rf squashfs-root
+		unsquashfs root.squashfs.orig
+		
+		if [ "$ONLY_EXTRACT" = Y ]; then
+			exit 0
+		fi
 
-	#######################################################
-	print_green ">>> Patching the firmware ..."
-	rm -rf /tmp/opkg-lists
-	( cd $rootfs_root; modify_rootfs )  # exits on error since 'bash -e' was used
-	#######################################################
-
+		#######################################################
+		print_green ">>> Patching the firmware ..."
+		rm -rf /tmp/opkg-lists
+		( cd $rootfs_root; modify_rootfs )  # exits on error since 'bash -e' was used
+		#######################################################
+	fi	
 	# Rebuild SquashFS image
 	print_green ">>> Repackaging the modified firmware ..."
+	local rootfs_root=squashfs-root
 	mksquashfs $rootfs_root root.squashfs -nopad -noappend -root-owned -comp xz -Xpreset 9 -Xe -Xlc 0 -Xlp 2 -Xpb 2 -b 256k -processors 1
 
 	if [ "$STRIP_UBOOT" = Y ]; then
@@ -350,4 +364,3 @@ case "$1" in
 	-h|--help) print_help;;
 	*) do_firmware_repack "$@";;
 esac
-
