@@ -17,7 +17,7 @@ OpenWrt firmware patching and repackaging tools - HiWiFi only
 
 ### Usage
 
-     hiwifi-repack.sh <ROM_file> [options] ...    patch firmware <ROM_file> and repackage
+     hiwifi-repack.sh <model> <ROM_file> [options] ...    patch firmware <ROM_file> and repackage
      hiwifi-repack.sh -c                          clean temporary and target files
      
     Options:
@@ -26,6 +26,8 @@ OpenWrt firmware patching and repackaging tools - HiWiFi only
      -i <package>              install package with ipk file path or URL (can be multiple)
      -e                        enable root login
      -x <commands>             execute commands after all other operations
+     -E                        EXTRACT
+     -P                        PACK
 
 ### Example
 
