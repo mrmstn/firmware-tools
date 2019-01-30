@@ -6,6 +6,7 @@ ENABLE_ROOT_LOGIN=N
 ENABLE_WIRELESS=N
 IGNORE_MODIFY_ERRORS=N
 OPKG_REMOVE_LIST=
+ADD_FILES_ROOT=
 OPKG_INSTALL_LIST=
 ROOTFS_CMDS=
 REPACK_FLAG=
@@ -56,6 +57,7 @@ Options:
  -o <output_file>          filename of newly built firmware
  -r <package>              remove opkg package (can be multiple)
  -i <package>              install package with ipk file path or URL (can be multiple)
+ -f <folder>               Add folder content to root (can be multiple)
  -e                        enable root login
  -w                        enable wireless by default
  -x <commands>             execute commands after all other operations
@@ -68,6 +70,14 @@ EOF
 modify_rootfs()
 {
 	local __rc=0
+
+	# Add files
+	local copy_root
+	for copy_root in ${ADD_FILES_ROOT}; do
+		print_green ">>> Adding ${copy_root} to root"
+		pwd
+		cp -rv "../$copy_root/"* ./
+	done
 
 	# Uninstall old packages
 	local ipkg
@@ -162,6 +172,10 @@ do_firmware_repack()
 				;;
 			-w)
 				ENABLE_WIRELESS=Y
+				;;
+			-f)
+			    shift 1
+				ADD_FILES_ROOT="$ADD_FILES_ROOT$1 "
 				;;
 			-F)
 				IGNORE_MODIFY_ERRORS=Y
@@ -328,4 +342,3 @@ case "$1" in
 	-h|--help) print_help;;
 	*) do_firmware_repack "$@";;
 esac
-
