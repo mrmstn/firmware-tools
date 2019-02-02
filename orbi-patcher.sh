@@ -82,7 +82,7 @@ build_final_image(){
 
 extract(){
     local rom_file="${1}"
-    openwrt-repack.sh "${rom_file}" -U
+    openwrt-repack "${rom_file}" -U
 }
 
 read_hw_id(){
